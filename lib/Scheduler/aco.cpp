@@ -22,7 +22,12 @@ double RandDouble(double min, double max) {
   return (rand * (max - min)) + min;
 }
 
-#define USE_ACS 1
+#define USE_ACS 0
+#define TWO_STEP 1
+#define MIN_DEPOSITION 0
+#define MAX_DEPOSITION 3
+#define MAX_DEPOSITION_MINUS_MIN (MAX_DEPOSITION-MIN_DEPOSITION)
+
 //#define BIASED_CHOICES 10000000
 //#define LOCAL_DECAY 0.1
 
@@ -112,7 +117,7 @@ double ACOScheduler::Score(SchedInstruction *from, Choice choice) {
 SchedInstruction *
 ACOScheduler::SelectInstruction(const llvm::ArrayRef<Choice> &ready,
                                 SchedInstruction *lastInst) {
-#if USE_ACS
+#if TWO_STEP
   double choose_best_chance;
   if (use_fixed_bias)
     choose_best_chance = fmax(0, 1 - (double)fixed_bias / count_);
@@ -270,6 +275,10 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
                                        SchedRegion *region) {
   rgn_ = region;
 
+  //compute the relative maximum score inverse
+  ScRelMax  = rgn_->GetHeuristicCost();
+  Logger::Info("max:%d", ScRelMax);
+
   // initialize pheremone
   // for this, we need the cost of the pure heuristic schedule
   int pheremone_size = (count_ + 1) * count_;
@@ -356,6 +365,10 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
   instNum = schedule->GetFrstInst(cycleNum, slotNum);
 
   SchedInstruction *lastInst = NULL;
+  pheremone_t portion = schedule->GetCost() / (ScRelMax*1.5);
+  pheremone_t deposition = fmax((1-portion)* MAX_DEPOSITION_MINUS_MIN,0) + MIN_DEPOSITION;
+//  deposition = MAX_DEPOSITION/log(schedule->GetCost());
+
   while (instNum != INVALID_VALUE) {
     SchedInstruction *inst = dataDepGraph_->GetInstByIndx(instNum);
 
@@ -366,7 +379,8 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
     *pheremone = (1 - decay_factor) * *pheremone +
                  decay_factor / (schedule->GetCost() + 1);
 #else
-    *pheremone = *pheremone + 1 / (schedule->GetCost() + 1);
+    //Logger::Info("ph:%f, SCost:%d, max:%f, potion:%f, dep:%f" , *pheremone, schedule->GetCost(), ScRelMax, portion, deposition);
+    *pheremone += deposition;
 #endif
     lastInst = inst;
 
@@ -378,7 +392,9 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
   // decay pheremone
   for (int i = 0; i < count_; i++) {
     for (int j = 0; j < count_; j++) {
-      Pheremone(i, j) *= (1 - decay_factor);
+      pheremone_t &PhPtr = Pheremone(i, j);
+      PhPtr *= (1 - decay_factor);
+      PhPtr = fmax(1,fmin(10, PhPtr));
     }
   }
 #endif
