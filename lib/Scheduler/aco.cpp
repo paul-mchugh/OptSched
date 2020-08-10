@@ -24,8 +24,8 @@ double RandDouble(double min, double max) {
 
 #define USE_ACS 0
 #define TWO_STEP 1
-#define MIN_DEPOSITION 0
-#define MAX_DEPOSITION 3
+#define MIN_DEPOSITION 1
+#define MAX_DEPOSITION 6
 #define MAX_DEPOSITION_MINUS_MIN (MAX_DEPOSITION-MIN_DEPOSITION)
 
 //#define BIASED_CHOICES 10000000
@@ -190,9 +190,6 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
   Initialize_();
   rgn_->InitForSchdulng();
 
-  // graph debugging
-  SmallVector<InstCount, 0> chosenPath;
-
   llvm::SmallVector<Choice, 0> ready;
   while (!IsSchedComplete_()) {
     // convert the ready list from a custom priority queue to a std::vector,
@@ -205,7 +202,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
       if (ChkInstLglty_(inst)) {
         Choice c;
         c.inst = inst;
-        c.heuristic = (double)heuristic / maxPriority;
+        c.heuristic = (double)heuristic / maxPriority + 1;
         ready.push_back(c);
         if (IsDbg && lastInst)
           LastHeu[std::make_pair(lastInst->GetNum(), inst->GetNum())] =
@@ -229,7 +226,7 @@ std::unique_ptr<InstSchedule> ACOScheduler::FindOneSchedule() {
     if (!ready.empty())
       inst = SelectInstruction(ready, lastInst);
     if (inst != NULL) {
-#ifdef USE_ACS
+#if USE_ACS
       // local pheremone decay
       pheremone_t *pheremone = &Pheremone(lastInst, inst);
       *pheremone = (1 - local_decay) * *pheremone + local_decay * initialValue_;
@@ -277,7 +274,6 @@ FUNC_RESULT ACOScheduler::FindSchedule(InstSchedule *schedule_out,
 
   //compute the relative maximum score inverse
   ScRelMax  = rgn_->GetHeuristicCost();
-  Logger::Info("max:%d", ScRelMax);
 
   // initialize pheremone
   // for this, we need the cost of the pure heuristic schedule
@@ -394,7 +390,7 @@ void ACOScheduler::UpdatePheremone(InstSchedule *schedule) {
     for (int j = 0; j < count_; j++) {
       pheremone_t &PhPtr = Pheremone(i, j);
       PhPtr *= (1 - decay_factor);
-      PhPtr = fmax(1,fmin(10, PhPtr));
+      PhPtr = fmax(1,fmin(8, PhPtr));
     }
   }
 #endif
