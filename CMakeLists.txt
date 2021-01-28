@@ -20,6 +20,10 @@ if(${PACKAGE_VERSION} VERSION_LESS "7.0")
   add_definitions("-DLLVM_DEBUG=DEBUG")
 endif()
 
+if(LLVM_ENABLE_ASSERTIONS)
+  add_compile_options(-DIS_DEBUG)
+endif()
+
 # If asserts are enabled opt-sched must be built with "IS_DEBUG".
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DIS_DEBUG")
 
@@ -41,6 +45,7 @@ set(OPT_SCHED_SRCS Scheduler/aco.cpp
   Scheduler/hist_table.cpp
   Scheduler/list_sched.cpp
   Scheduler/logger.cpp
+  Scheduler/multithreaded_jobs.cpp
   Scheduler/reg_alloc.cpp
   Scheduler/utilities.cpp
   Scheduler/machine_model.cpp
